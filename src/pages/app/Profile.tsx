@@ -7,7 +7,9 @@ import { CIVIL_STATUSES, ID_TYPES, PUROKS, ageFrom, errMsg, fmtDateTime } from '
 import { extOf, signedUrl, uploadResidentFile } from '../../lib/storage'
 import type { Profile as ProfileT } from '../../lib/types'
 import { PageLoader, VerificationPill } from '../../components/ui'
-import IdOcrField from '../../components/IdOcrField'
+import IdScanner from '../../components/IdScanner'
+import { addressToForm } from '../../lib/idParser'
+import type { OcrResult } from '../../lib/ocr'
 import SelfieCapture from '../../components/SelfieCapture'
 import ProfilePhoto from '../../components/ProfilePhoto'
 
@@ -65,6 +67,7 @@ function ProfileForm({
   const [idNumber, setIdNumber] = useState(profile.id_number ?? '')
   const [idFile, setIdFile] = useState<File | null>(null)
   const [ocrText, setOcrText] = useState('')
+  const [scanNote, setScanNote] = useState<{ filled: number; nameMismatch: boolean } | null>(null)
   const [selfie, setSelfie] = useState<Blob | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [verifyErr, setVerifyErr] = useState('')
@@ -88,6 +91,43 @@ function ProfileForm({
   const locked = profile.verification_status === 'verified' || profile.verification_status === 'pending'
   const incomplete = profileIncomplete(profile)
   const canSubmitId = profile.verification_status === 'unverified' || profile.verification_status === 'rejected'
+
+  /** Use the ID to fill empty personal fields (never overwrites what's already there). */
+  const applyScan = (r: OcrResult) => {
+    const p = r.parsed
+    setOcrText(r.text.slice(0, 4000))
+    if (p.idNumber && !idNumber.trim()) setIdNumber(p.idNumber)
+    const addr = addressToForm(p.address, PUROKS)
+    let filled = 0
+    if (!locked) {
+      const incoming: Partial<Details> = {
+        first_name: p.firstName,
+        middle_name: p.middleName,
+        last_name: p.lastName,
+        suffix: p.suffix,
+        birth_date: p.birthDate,
+        street_address: addr.street,
+      }
+      const patch: Partial<Details> = {}
+      for (const [k, v] of Object.entries(incoming) as [keyof Details, string][]) {
+        if (v && !String(d[k] ?? '').trim()) {
+          patch[k] = v
+          filled++
+        }
+      }
+      if (addr.purok && !profile.purok) {
+        patch.purok = addr.purok
+        filled++
+      }
+      if (filled) setD((x) => ({ ...x, ...patch }))
+    }
+    const norm = (s: string) => s.toUpperCase().replace(/[^A-ZÑ]/g, '')
+    const nameMismatch =
+      !!(p.firstName || p.lastName) &&
+      !!(d.first_name || d.last_name) &&
+      (norm(p.lastName) !== norm(d.last_name) || !norm(p.firstName).includes(norm(d.first_name.split(' ')[0] ?? '')))
+    setScanNote({ filled, nameMismatch })
+  }
 
   const saveDetails = async (e: FormEvent) => {
     e.preventDefault()
@@ -277,16 +317,23 @@ function ProfileForm({
                       {ID_TYPES.map((t) => <option key={t}>{t}</option>)}
                     </select>
                   </div>
-                  <IdOcrField
-                    file={idFile}
-                    onFile={setIdFile}
-                    idNumber={idNumber}
-                    onIdNumber={setIdNumber}
-                    ocrText={ocrText}
-                    onOcrText={setOcrText}
-                    firstName={profile.first_name}
-                    lastName={profile.last_name}
-                  />
+                  <IdScanner file={idFile} onFile={setIdFile} onScanned={applyScan} />
+                  <div style={{ maxWidth: 380 }}>
+                    <label className="form-label">ID number</label>
+                    <input className="form-control mono" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Filled in after reading your ID" />
+                  </div>
+                  {scanNote && scanNote.filled > 0 && (
+                    <div className="note py-2">
+                      <i className="bi bi-magic"></i>
+                      <span>We filled {scanNote.filled} empty field{scanNote.filled > 1 ? 's' : ''} in <strong>Personal details</strong> from your ID. Check them and click <strong>Save details</strong>.</span>
+                    </div>
+                  )}
+                  {scanNote?.nameMismatch && (
+                    <div className="note note-warn py-2">
+                      <i className="bi bi-exclamation-circle"></i>
+                      <span>The name on your ID doesn’t match your profile name. Make sure both are correct — the secretary will compare them.</span>
+                    </div>
+                  )}
                 </div>
                 <div className="col-lg-5">
                   <label className="form-label">Selfie</label>

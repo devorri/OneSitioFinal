@@ -521,3 +521,53 @@ a:hover { color: var(--ink); text-decoration: underline; }
   justify-content: center;
   box-shadow: 0 0 0 3px #fff;
 }
+
+/* ---------- ID scanner ---------- */
+.scan-frame {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--soft);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+.scan-canvas { display: block; width: 100%; height: auto; }
+.scan-frame.adjusting .scan-canvas { opacity: 0.55; }
+.crop-box {
+  position: absolute;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 9999px rgba(17, 24, 39, 0.25);
+  cursor: move;
+  background: rgba(255, 255, 255, 0.08);
+}
+.crop-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+}
+.crop-handle.nw { left: -9px; top: -9px; cursor: nwse-resize; }
+.crop-handle.ne { right: -9px; top: -9px; cursor: nesw-resize; }
+.crop-handle.sw { left: -9px; bottom: -9px; cursor: nesw-resize; }
+.crop-handle.se { right: -9px; bottom: -9px; cursor: nwse-resize; }
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  box-shadow: 0 0 12px var(--primary);
+  animation: scan-sweep 1.6s ease-in-out infinite alternate;
+}
+@keyframes scan-sweep { from { top: 4%; } to { top: 94%; } }
+.scan-results { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+.scan-results li { display: grid; grid-template-columns: 18px 90px 1fr; gap: 0.5rem; font-size: 0.9rem; align-items: start; }
+.scan-results .ok { color: var(--ok); }
+.scan-results .miss { color: var(--faint); }
+.scan-results .k { color: var(--muted); }
+.scan-results .v { color: var(--ink); word-break: break-word; }
+.from-id { font-size: 0.7rem; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 999px; padding: 0.05rem 0.45rem; margin-left: 0.35rem; }
+.age-chip { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; margin-top: 0.35rem; }

@@ -4,12 +4,14 @@ import { supabase } from '../supabaseClient'
 import { usePageTitle } from '../usePageTitle'
 import { useAuth } from '../auth/context'
 import { CIVIL_STATUSES, ID_TYPES, PUROKS, ageFrom, errMsg } from '../lib/format'
+import { addressToForm } from '../lib/idParser'
+import type { OcrResult } from '../lib/ocr'
 import { extOf, uploadResidentFile } from '../lib/storage'
-import IdOcrField from '../components/IdOcrField'
+import IdScanner from '../components/IdScanner'
 import SelfieCapture from '../components/SelfieCapture'
 import SocialButtons from '../components/SocialButtons'
 
-const STEPS = ['Personal details', 'Valid ID', 'Selfie', 'Account']
+const STEPS = ['Valid ID', 'Personal details', 'Selfie', 'Account']
 
 interface Form {
   first_name: string
@@ -30,6 +32,8 @@ interface Form {
   consent: boolean
 }
 
+type TextKey = Exclude<keyof Form, 'is_household_head' | 'consent'>
+
 const EMPTY: Form = {
   first_name: '', middle_name: '', last_name: '', suffix: '', birth_date: '', civil_status: 'Single',
   mobile: '', email: '', purok: PUROKS[0], street_address: '', id_type: ID_TYPES[0], id_number: '',
@@ -47,17 +51,64 @@ export default function Register() {
   const [errors, setErrors] = useState<Partial<Record<keyof Form | 'id_file' | 'selfie', string>>>({})
   const [idFile, setIdFile] = useState<File | null>(null)
   const [ocrText, setOcrText] = useState('')
+  const [fromId, setFromId] = useState<Set<TextKey>>(new Set())
+  const [autoVals, setAutoVals] = useState<Partial<Record<TextKey, string>>>({})
+  const [idAddress, setIdAddress] = useState<{ text: string; inTalampas: boolean } | null>(null)
   const [selfie, setSelfie] = useState<Blob | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [done, setDone] = useState<Done>(null)
 
-  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => {
+    setForm((f) => ({ ...f, [k]: v }))
+    if (fromId.has(k as TextKey)) {
+      setFromId((s) => {
+        const n = new Set(s)
+        n.delete(k as TextKey)
+        return n
+      })
+    }
+  }
   const age = ageFrom(form.birth_date)
+
+  /** Fill the form from the ID. Never overwrites something the user typed themselves. */
+  const applyScan = (r: OcrResult) => {
+    const p = r.parsed
+    const addr = addressToForm(p.address, PUROKS)
+    const incoming: Partial<Record<TextKey, string>> = {
+      first_name: p.firstName,
+      middle_name: p.middleName,
+      last_name: p.lastName,
+      suffix: p.suffix,
+      birth_date: p.birthDate,
+      id_number: p.idNumber,
+      street_address: addr.street,
+      purok: addr.purok,
+    }
+    const willFill = (Object.keys(incoming) as TextKey[]).filter((k) => {
+      const cur = form[k]
+      return !!incoming[k] && (!cur || cur === autoVals[k] || (k === 'purok' && cur === PUROKS[0]))
+    })
+    setForm((f) => {
+      const next = { ...f }
+      for (const [k, v] of Object.entries(incoming) as [TextKey, string][]) {
+        if (!v) continue
+        const cur = f[k]
+        const untouched = !cur || cur === autoVals[k] || (k === 'purok' && cur === PUROKS[0])
+        if (untouched) next[k] = v
+      }
+      return next
+    })
+    setAutoVals(incoming)
+    setFromId(new Set(willFill))
+    setOcrText(r.text.slice(0, 4000))
+    setIdAddress(p.address ? { text: p.address, inTalampas: addr.inTalampas } : null)
+  }
 
   const validate = (s: number) => {
     const e: typeof errors = {}
-    if (s === 0) {
+    if (s === 0 && !idFile) e.id_file = 'Please upload a photo of your ID'
+    if (s === 1) {
       if (!form.first_name.trim()) e.first_name = 'Required'
       if (!form.last_name.trim()) e.last_name = 'Required'
       if (!form.birth_date) e.birth_date = 'Required'
@@ -66,7 +117,6 @@ export default function Register() {
       if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) e.email = 'Enter a valid email'
       if (!form.street_address.trim()) e.street_address = 'Required'
     }
-    if (s === 1 && !idFile) e.id_file = 'Please upload a photo of your ID'
     if (s === 2 && !selfie) e.selfie = 'Please take or upload a selfie'
     if (s === 3) {
       if (form.password.length < 8) e.password = 'At least 8 characters'
@@ -102,7 +152,7 @@ export default function Register() {
             is_household_head: form.is_household_head,
             id_type: form.id_type,
             id_number: form.id_number.trim(),
-            ocr_text: ocrText.slice(0, 4000),
+            ocr_text: ocrText,
           },
         },
       })
@@ -110,7 +160,6 @@ export default function Register() {
       if (data.user && data.user.identities && data.user.identities.length === 0) {
         throw new Error('This email is already registered. Please log in instead.')
       }
-
       if (!data.session || !data.user) {
         setDone('confirm-email')
         return
@@ -139,6 +188,7 @@ export default function Register() {
   }
 
   const err = (k: keyof typeof errors) => errors[k] && <div className="field-error">{errors[k]}</div>
+  const tag = (k: TextKey) => fromId.has(k) && <span className="from-id">from ID</span>
 
   if (done) {
     return (
@@ -174,7 +224,7 @@ export default function Register() {
   }
 
   return (
-    <div className="container py-5" style={{ maxWidth: 820 }}>
+    <div className="container py-5" style={{ maxWidth: 860 }}>
       <div className="mb-4">
         <span className="eyebrow">Resident registration</span>
         <h1 className="mt-1 mb-1" style={{ fontSize: '1.9rem' }}>Gumawa ng OneSitio account</h1>
@@ -186,7 +236,7 @@ export default function Register() {
           <div className="row g-3 align-items-center">
             <div className="col-md-5">
               <div className="fw-medium">Mas mabilis gamit ang Google o Facebook</div>
-              <div className="small text-muted">Kakailanganin mo pa ring ilagay ang address at mag-upload ng ID pagkatapos.</div>
+              <div className="small text-muted">Kakailanganin mo pa ring mag-upload ng ID pagkatapos.</div>
             </div>
             <div className="col-md-7">
               <SocialButtons googleLabel="Sign up with Google" facebookLabel="Sign up with Facebook" />
@@ -206,30 +256,67 @@ export default function Register() {
         </div>
 
         {step === 0 && (
+          <div className="d-grid gap-3">
+            <div>
+              <h2 className="h5 mb-1">I-upload ang iyong valid ID</h2>
+              <p className="text-muted small mb-0">Babasahin namin ang ID para awtomatikong mapunan ang pangalan, kaarawan, at address mo.</p>
+            </div>
+            <div className="row g-3">
+              <div className="col-md-6">
+                <label className="form-label">ID type</label>
+                <select className="form-select" value={form.id_type} onChange={(e) => set('id_type', e.target.value)}>
+                  {ID_TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">ID number {tag('id_number')}</label>
+                <input className="form-control mono" value={form.id_number} onChange={(e) => set('id_number', e.target.value)} placeholder="Filled in after reading your ID" />
+              </div>
+            </div>
+            <IdScanner file={idFile} onFile={setIdFile} onScanned={applyScan} />
+            {err('id_file')}
+          </div>
+        )}
+
+        {step === 1 && (
           <div className="row g-3">
+            {fromId.size > 0 && (
+              <div className="col-12">
+                <div className="note py-2">
+                  <i className="bi bi-magic"></i>
+                  <span>Fields marked <span className="from-id ms-0">from ID</span> were read from your ID. Please check them — OCR can make mistakes.</span>
+                </div>
+              </div>
+            )}
             <div className="col-md-4">
-              <label className="form-label">First name</label>
+              <label className="form-label">First name {tag('first_name')}</label>
               <input className="form-control" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} autoComplete="given-name" />
               {err('first_name')}
             </div>
             <div className="col-md-3">
-              <label className="form-label">Middle name <span className="text-muted">(optional)</span></label>
+              <label className="form-label">Middle name {tag('middle_name')}</label>
               <input className="form-control" value={form.middle_name} onChange={(e) => set('middle_name', e.target.value)} autoComplete="additional-name" />
             </div>
             <div className="col-md-3">
-              <label className="form-label">Last name</label>
+              <label className="form-label">Last name {tag('last_name')}</label>
               <input className="form-control" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} autoComplete="family-name" />
               {err('last_name')}
             </div>
             <div className="col-md-2">
-              <label className="form-label">Suffix</label>
+              <label className="form-label">Suffix {tag('suffix')}</label>
               <input className="form-control" value={form.suffix} onChange={(e) => set('suffix', e.target.value)} placeholder="Jr." />
             </div>
 
             <div className="col-md-4">
-              <label className="form-label">Birth date</label>
+              <label className="form-label">Birth date {tag('birth_date')}</label>
               <input type="date" className="form-control" value={form.birth_date} onChange={(e) => set('birth_date', e.target.value)} max={new Date().toISOString().slice(0, 10)} />
-              {err('birth_date') || (age !== null && age >= 15 && <div className="form-text">{age} years old</div>)}
+              {err('birth_date') ||
+                (age !== null && (
+                  <div className="age-chip" style={{ color: age >= 15 ? 'var(--ok)' : 'var(--bad)' }}>
+                    <i className={`bi ${age >= 15 ? 'bi-check-circle' : 'bi-x-circle'}`}></i>
+                    {age} years old {age >= 15 ? '· eligible' : '· must be 15+'}
+                  </div>
+                ))}
             </div>
             <div className="col-md-4">
               <label className="form-label">Civil status</label>
@@ -249,38 +336,27 @@ export default function Register() {
               {err('email')}
             </div>
             <div className="col-md-6">
-              <label className="form-label">Purok / Sitio</label>
+              <label className="form-label">Purok / Sitio {tag('purok')}</label>
               <select className="form-select" value={form.purok} onChange={(e) => set('purok', e.target.value)}>
                 {PUROKS.map((p) => <option key={p}>{p}</option>)}
               </select>
             </div>
             <div className="col-12">
-              <label className="form-label">House no. / street</label>
+              <label className="form-label">House no. / street {tag('street_address')}</label>
               <input className="form-control" value={form.street_address} onChange={(e) => set('street_address', e.target.value)} placeholder="124 Mabini St." autoComplete="street-address" />
               {err('street_address')}
+              {idAddress && (
+                <div className="form-text">Address on ID: {idAddress.text}</div>
+              )}
             </div>
-          </div>
-        )}
-
-        {step === 1 && (
-          <div className="d-grid gap-3">
-            <div style={{ maxWidth: 420 }}>
-              <label className="form-label">ID type</label>
-              <select className="form-select" value={form.id_type} onChange={(e) => set('id_type', e.target.value)}>
-                {ID_TYPES.map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <IdOcrField
-              file={idFile}
-              onFile={setIdFile}
-              idNumber={form.id_number}
-              onIdNumber={(v) => set('id_number', v)}
-              ocrText={ocrText}
-              onOcrText={setOcrText}
-              firstName={form.first_name}
-              lastName={form.last_name}
-            />
-            {err('id_file')}
+            {idAddress && !idAddress.inTalampas && (
+              <div className="col-12">
+                <div className="note note-warn py-2">
+                  <i className="bi bi-geo-alt"></i>
+                  <span>The address on your ID isn’t in Barangay Talampas. You can still register — the secretary may ask for proof that you live here now.</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
