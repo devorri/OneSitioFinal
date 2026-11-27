@@ -6,6 +6,7 @@ import { nameFoundInText } from '../../lib/ocr'
 import { signedUrl } from '../../lib/storage'
 import type { Profile, Verification } from '../../lib/types'
 import { EmptyState, Modal, PageLoader, VerificationPill } from '../../components/ui'
+import Avatar from '../../components/Avatar'
 
 const FILTERS: { key: Verification | 'all'; label: string }[] = [
   { key: 'pending', label: 'To review' },
@@ -80,8 +81,13 @@ export default function Residents() {
                 {shown.map((p) => (
                   <tr key={p.id} className="clickable" onClick={() => setOpen(p)}>
                     <td>
-                      <div className="fw-medium">{fullName(p) || '—'}</div>
-                      <div className="small text-muted">{p.email} · <span className="mono">{p.resident_code}</span></div>
+                      <div className="d-flex align-items-center gap-2">
+                        <Avatar url={p.avatar_url} name={fullName(p) || p.email || '?'} size={34} />
+                        <div>
+                          <div className="fw-medium">{fullName(p) || '—'}</div>
+                          <div className="small text-muted">{p.email} · <span className="mono">{p.resident_code}</span></div>
+                        </div>
+                      </div>
                     </td>
                     <td className="small">{p.purok || '—'}</td>
                     <td className="small">{p.id_type || '—'}</td>

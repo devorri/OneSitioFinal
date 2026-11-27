@@ -20,7 +20,7 @@ export default function AuthCallback() {
 
   useEffect(() => {
     if (session && profile?.email) {
-      rememberAccount({ email: profile.email, name: fullName(profile) || profile.email, staff: profile.role !== 'resident' })
+      rememberAccount({ email: profile.email, name: fullName(profile) || profile.email, staff: profile.role !== 'resident', avatar: profile.avatar_url })
     }
   }, [session, profile])
 

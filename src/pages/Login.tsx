@@ -4,8 +4,9 @@ import { supabase } from '../supabaseClient'
 import { usePageTitle } from '../usePageTitle'
 import { useAuth } from '../auth/context'
 import { forgetAccount, getRecentAccounts, rememberAccount, type RecentAccount } from '../lib/recent'
-import { fullName, initialsOf } from '../lib/format'
+import { fullName } from '../lib/format'
 import SocialButtons from '../components/SocialButtons'
+import Avatar from '../components/Avatar'
 import { PageLoader } from '../components/ui'
 import './Login.css'
 
@@ -219,9 +220,9 @@ export default function Login() {
       setSubmitting(false)
       return
     }
-    const { data: prof } = await supabase.from('profiles').select('first_name,last_name,role').eq('id', data.user.id).maybeSingle()
+    const { data: prof } = await supabase.from('profiles').select('first_name,last_name,role,avatar_url').eq('id', data.user.id).maybeSingle()
     const staff = !!prof && prof.role !== 'resident'
-    rememberAccount({ email: email.trim(), name: prof ? fullName(prof) || email.trim() : email.trim(), staff })
+    rememberAccount({ email: email.trim(), name: prof ? fullName(prof) || email.trim() : email.trim(), staff, avatar: prof?.avatar_url ?? null })
     navigate(from ?? (staff ? '/staff' : '/app'), { replace: true })
   }
 
@@ -290,7 +291,7 @@ export default function Login() {
                   {recent.map((a) => (
                     <li key={a.email}>
                       <button type="button" className="os-profile-row" onClick={() => pick(a)}>
-                        <span className="os-profile-avatar os-profile-initials">{initialsOf(a.name)}</span>
+                        <span className="os-profile-avatar-wrap"><Avatar url={a.avatar} name={a.name} size={60} /></span>
                         <span className="os-profile-text">
                           <span className="os-profile-name">{a.name}</span>
                           <span className="os-profile-sub">{a.staff ? t.staffSub : t.residentSub} · {a.email}</span>

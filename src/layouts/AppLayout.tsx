@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/context'
 import { supabase } from '../supabaseClient'
-import { fullName, initialsOf } from '../lib/format'
+import { fullName } from '../lib/format'
+import Avatar from '../components/Avatar'
 
 interface NavItem {
   to: string
@@ -92,7 +93,7 @@ export default function AppLayout({ variant }: { variant: 'resident' | 'staff' }
         </div>
 
         <div className="mt-auto d-flex align-items-center gap-2 px-2">
-          <span className="avatar">{initialsOf(name)}</span>
+          <Avatar url={profile?.avatar_url} name={name} />
           <div className="flex-grow-1 min-w-0" style={{ minWidth: 0 }}>
             <div className="small fw-semibold text-truncate">{name}</div>
             <div className="small text-muted text-truncate">{profile?.resident_code}</div>

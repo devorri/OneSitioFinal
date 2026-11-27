@@ -9,6 +9,7 @@ import type { Profile as ProfileT } from '../../lib/types'
 import { PageLoader, VerificationPill } from '../../components/ui'
 import IdOcrField from '../../components/IdOcrField'
 import SelfieCapture from '../../components/SelfieCapture'
+import ProfilePhoto from '../../components/ProfilePhoto'
 
 type Details = Pick<ProfileT, 'first_name' | 'last_name' | 'civil_status' | 'purok'> & {
   middle_name: string
@@ -222,6 +223,8 @@ function ProfileForm({
         </div>
 
         <div className="col-lg-5 d-grid gap-3 align-content-start">
+          <ProfilePhoto profile={profile} onSaved={onSaved} />
+
           <div className="panel">
             <div className="panel-head"><h2>Account</h2></div>
             <dl className="kv" style={{ gridTemplateColumns: '110px 1fr', fontSize: '0.9rem' }}>

@@ -7,6 +7,7 @@ import { fmtDate, fullName, peso } from '../../lib/format'
 import type { DocumentRequest } from '../../lib/types'
 import { EmptyState, PageLoader, PaymentPill, RequestStatusPill, VerificationPill } from '../../components/ui'
 import VerificationNotice from './VerificationNotice'
+import Avatar from '../../components/Avatar'
 
 function greeting() {
   const h = new Date().getHours()
@@ -124,10 +125,15 @@ export default function Dashboard() {
               <h2>My details</h2>
               <Link to="/app/profile" className="small">Edit</Link>
             </div>
-            <div className="fw-semibold">{fullName(profile)}</div>
-            <div className="small text-muted mb-3">
-              {[profile.street_address, profile.purok].filter(Boolean).join(', ')}
-              <br />Barangay Talampas, Bustos, Bulacan
+            <div className="d-flex align-items-center gap-3 mb-3">
+              <Avatar url={profile.avatar_url} name={fullName(profile)} size={56} />
+              <div>
+                <div className="fw-semibold">{fullName(profile)}</div>
+                <div className="small text-muted">
+                  {[profile.street_address, profile.purok].filter(Boolean).join(', ')}
+                  <br />Barangay Talampas, Bustos, Bulacan
+                </div>
+              </div>
             </div>
             <dl className="kv" style={{ gridTemplateColumns: '110px 1fr', fontSize: '0.88rem' }}>
               <dt>Resident ID</dt><dd className="mono">{profile.resident_code}</dd>

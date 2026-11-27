@@ -30,6 +30,7 @@ export interface Profile {
   ocr_text: string | null
   verification_note: string | null
   verified_at: string | null
+  avatar_url: string | null
   created_at: string
   updated_at: string
 }
@@ -70,7 +71,7 @@ export interface DocumentRequest {
   updated_at: string
   released_at: string | null
   document_types?: { name: string } | null
-  profiles?: Pick<Profile, 'first_name' | 'last_name' | 'resident_code' | 'email' | 'mobile' | 'purok'> | null
+  profiles?: Pick<Profile, 'first_name' | 'last_name' | 'resident_code' | 'email' | 'mobile' | 'purok' | 'avatar_url'> | null
 }
 
 export interface RequestEvent {

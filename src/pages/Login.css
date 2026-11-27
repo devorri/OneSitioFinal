@@ -334,12 +334,12 @@
 
 .os-btn-primary {
   border: none;
-  background: var(--ink);
+  background: #1f4fb3;
   color: #fff;
 }
 
 .os-btn-primary:hover:not(:disabled) {
-  background: #000;
+  background: #183f91;
 }
 
 .os-btn-primary:disabled {
@@ -380,8 +380,8 @@
 }
 
 .os-input:focus {
-  border-color: var(--ink-soft);
-  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.06);
+  border-color: #1f4fb3;
+  box-shadow: 0 0 0 3px rgba(31, 79, 179, 0.1);
 }
 
 .os-input-wrap .os-input {
@@ -434,8 +434,8 @@
 }
 
 .os-login-panel .form-check-input:checked {
-  background-color: var(--ink);
-  border-color: var(--ink);
+  background-color: #1f4fb3;
+  border-color: #1f4fb3;
 }
 
 .os-login-panel .form-check-input:focus {
@@ -560,4 +560,16 @@
 .os-login-panel .social-btn {
   padding: 0.8rem 1.1rem;
   font-size: 1rem;
+}
+
+.os-profile-avatar-wrap {
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.os-profile-avatar-wrap .avatar {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #374151;
+  background: #eceef1;
 }

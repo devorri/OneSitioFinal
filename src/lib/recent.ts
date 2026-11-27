@@ -3,6 +3,7 @@ export interface RecentAccount {
   email: string
   name: string
   staff: boolean
+  avatar?: string | null
 }
 
 const KEY = 'onesitio-recent-accounts'
